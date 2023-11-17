@@ -438,23 +438,28 @@ def _tensor_matrix_multiply(
     # TODO: Implement for Task 3.4.
     assert a_shape[-1] == b_shape[-2]
     res = 0.0
-    if i < out_shape[-2] and j < out_shape[-1]:
-        common_shape = a_shape[-1]
-        for common_index in range(0, common_shape, BLOCK_DIM):
-            thread_common_row = common_index + pi
-            thread_common_col = common_index + pj
-            if thread_common_col < common_shape:
-                a_loc = (batch * a_batch_stride) + (a_strides[-2] * i) + (a_strides[-1] * thread_common_col)
-                a_shared[pi, pj] = a_storage[a_loc]
-            if thread_common_row < common_shape:
-                b_loc = (batch * b_batch_stride) + (b_strides[-1] * j) + (b_strides[-2] * thread_common_row)
-                b_shared[pi, pj] = b_storage[b_loc]
-            cuda.syncthreads()
-            for k in range(BLOCK_DIM):
+    
+    common_shape = a_shape[-1]
+    for common_index in range(0, common_shape, BLOCK_DIM):
+        thread_common_row = common_index + pi
+        thread_common_col = common_index + pj
+        if thread_common_col < common_shape and i < a_shape[-2]:
+            a_loc = (batch * a_batch_stride) + (a_strides[-2] * i) + (a_strides[-1] * thread_common_col)
+            a_shared[pi, pj] = a_storage[a_loc]
+        if thread_common_row < common_shape and j < b_shape[-1]:
+            b_loc = (batch * b_batch_stride) + (b_strides[-1] * j) + (b_strides[-2] * thread_common_row)
+            b_shared[pi, pj] = b_storage[b_loc]
+        cuda.syncthreads()
+        for k in range(BLOCK_DIM):
+            if common_index + k < common_shape:
                 res += a_shared[pi, k] * b_shared[k, pj]
-            cuda.syncthreads()
+        cuda.syncthreads()
+    if i < out_shape[-2] and j < out_shape[-1]:
         out_loc = (batch * out_strides[0]) + (out_strides[-2] * i) + (out_strides[-1] * j)
         out[out_loc] = res
+
+    
+
 
 
 
