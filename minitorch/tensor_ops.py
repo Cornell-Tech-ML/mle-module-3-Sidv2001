@@ -268,16 +268,14 @@ def tensor_map(fn: Callable[[float], float]) -> Any:
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        out_index = np.zeros(out_shape.shape, dtype=np.int32)
-        in_index = np.zeros(in_shape.shape, dtype=np.int32)
-        for i in range(np.prod(out_shape)):
+        out_index: Index = np.zeros(MAX_DIMS, np.int16)
+        in_index: Index = np.zeros(MAX_DIMS, np.int16)
+        for i in range(len(out)):
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, in_shape, in_index)
-            pos = index_to_position(in_index, in_strides)
-            res = fn(in_storage[pos])
-            out_pos = index_to_position(out_index, out_strides)
-            out[out_pos] = res
+            o = index_to_position(out_index, out_strides)
+            j = index_to_position(in_index, in_strides)
+            out[o] = fn(in_storage[j])
 
     return _map
 
@@ -326,19 +324,17 @@ def tensor_zip(fn: Callable[[float, float], float]) -> Any:
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        out_index: Index = np.zeros(out_shape.shape, dtype=np.int32)
-        a_index = np.zeros(a_shape.shape, dtype=np.int32)
-        b_index = np.zeros(b_shape.shape, dtype=np.int32)
-        for i in range(int(np.prod(out_shape))):
+        out_index: Index = np.zeros(MAX_DIMS, np.int32)
+        a_index: Index = np.zeros(MAX_DIMS, np.int32)
+        b_index: Index = np.zeros(MAX_DIMS, np.int32)
+        for i in range(len(out)):
             to_index(i, out_shape, out_index)
+            o = index_to_position(out_index, out_strides)
             broadcast_index(out_index, out_shape, a_shape, a_index)
+            j = index_to_position(a_index, a_strides)
             broadcast_index(out_index, out_shape, b_shape, b_index)
-            a_pos = index_to_position(a_index, a_strides)
-            b_pos = index_to_position(b_index, b_strides)
-            res = fn(a_storage[a_pos], b_storage[b_pos])
-            out_pos = index_to_position(out_index, out_strides)
-            out[out_pos] = res
+            k = index_to_position(b_index, b_strides)
+            out[o] = fn(a_storage[j], b_storage[k])
 
     return _zip
 
@@ -373,19 +369,15 @@ def tensor_reduce(fn: Callable[[float, float], float]) -> Any:
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        out_index: Index = np.zeros(out_shape.shape, dtype=np.int32)
-        a_index = np.zeros(a_shape.shape, dtype=np.int32)
-        for i in range(np.prod(out_shape)):
+        out_index: Index = np.zeros(MAX_DIMS, np.int32)
+        reduce_size = a_shape[reduce_dim]
+        for i in range(len(out)):
             to_index(i, out_shape, out_index)
-            out_pos = index_to_position(out_index, out_strides)
-            res = out[out_pos]
-            a_index = out_index
-            for j in range(a_shape[reduce_dim]):
-                a_index[reduce_dim] = j
-                pos = index_to_position(a_index, a_strides)
-                res = fn(a_storage[pos], res)
-            out[out_pos] = res
+            o = index_to_position(out_index, out_strides)
+            for s in range(reduce_size):
+                out_index[reduce_dim] = s
+                j = index_to_position(out_index, a_strides)
+                out[o] = fn(out[o], a_storage[j])
 
     return _reduce
 
