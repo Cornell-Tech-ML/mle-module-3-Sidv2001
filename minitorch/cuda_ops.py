@@ -453,7 +453,7 @@ def _tensor_matrix_multiply(
             for k in range(BLOCK_DIM):
                 res += a_shared[pi, k] * b_shared[k, pj]
             cuda.syncthreads()
-        out_loc = (batch * out_strides) + (out_strides[-2] * i) + (out_strides[-1] * j)
+        out_loc = (batch * out_strides[0]) + (out_strides[-2] * i) + (out_strides[-1] * j)
         out[out_loc] = res
 
 
