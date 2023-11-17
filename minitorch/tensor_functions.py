@@ -186,6 +186,7 @@ class LT(Function):
     def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
         ctx.save_for_backward(a.shape, b.shape)
         return a.f.lt_zip(a, b)
+    @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
         a_shape, b_shape = ctx.saved_values
         return zeros(a_shape), zeros(b_shape)
