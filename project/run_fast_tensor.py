@@ -71,11 +71,12 @@ class FastTrain:
         losses = []
         timed = []
         for epoch in range(max_epochs):
-            start_time = time.time()
+            
             total_loss = 0.0
             c = list(zip(data.X, data.y))
             random.shuffle(c)
             X_shuf, y_shuf = zip(*c)
+            start_time = time.time()
 
             for i in range(0, len(X_shuf), BATCH):
                 optim.zero_grad()
