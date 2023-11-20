@@ -105,7 +105,7 @@ class FastTrain:
                 correct = int(((out.detach() > 0.5) == y2).sum()[0])
                 avg_time_per_epoch = sum(timed) / len(timed)
                 timed = []
-                log_fn(epoch, total_loss, correct, losses, timed)
+                log_fn(epoch, total_loss, correct, losses, avg_time_per_epoch)
 
 
 if __name__ == "__main__":
