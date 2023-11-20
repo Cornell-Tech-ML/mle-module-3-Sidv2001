@@ -160,7 +160,7 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         # TODO: Implement for Task 3.1.
-        for o in range(len(out)):
+        for o in prange(len(out)):
             out_index: Index = np.zeros_like(out_shape)
             in_index: Index = np.zeros_like(in_shape)
             to_index(o, out_shape, out_index)
