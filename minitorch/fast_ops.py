@@ -253,9 +253,10 @@ def tensor_reduce(
             out_index: Index = np.zeros_like(out_shape)
             reduce_size = a_shape[reduce_dim]
             to_index(o, out_shape, out_index)
+            res = index_to_position(out_index, a_strides)
+            dim_stride = a_strides[reduce_dim]
             for s in range(reduce_size):
-                out_index[reduce_dim] = s
-                j = index_to_position(out_index, a_strides)
+                j = res + (s * dim_stride)
                 out[o] = fn(out[o], a_storage[j])
 
     return njit(parallel=True)(_reduce)  # type: ignore
