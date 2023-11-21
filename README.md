@@ -32,6 +32,239 @@ The files that will be synced are:
 
         minitorch/tensor_data.py minitorch/tensor_functions.py minitorch/tensor_ops.py minitorch/operators.py minitorch/module.py minitorch/autodiff.py minitorch/module.py project/run_manual.py project/run_scalar.py project/run_tensor.py
 
+python parallel_check.py output:
+MAP
+
+================================================================================
+Parallel Accelerator Optimizing: Function tensor_map.<locals>.\_map,
+/content/mle-module-3-Sidv2001/minitorch/fast_ops.py (154)  
+================================================================================
+
+Parallel loop listing for Function tensor_map.<locals>.\_map, /content/mle-module-3-Sidv2001/minitorch/fast_ops.py (154)
+-------------------------------------------------------------------------|loop #ID
+def \_map( |
+out: Storage, |
+out_shape: Shape, |
+out_strides: Strides, |
+in_storage: Storage, |
+in_shape: Shape, |
+in_strides: Strides, |
+) -> None: | # TODO: Implement for Task 3.1. |
+for o in prange(len(out)):---------------------------------------| #0
+out_index: Index = np.zeros_like(out_shape) |
+in_index: Index = np.zeros_like(in_shape) |
+to_index(o, out_shape, out_index) |
+broadcast_index(out_index, out_shape, in_shape, in_index) |
+i = index_to_position(in_index, in_strides) |
+out[o] = fn(in_storage[i]) |
+--------------------------------- Fusing loops ---------------------------------
+Attempting fusion of parallel loops (combines loops with similar properties)...
+Following the attempted fusion of parallel for-loops there are 1 parallel for-
+loop(s) (originating from loops labelled: #0).
+
+---
+
+## ----------------------------- Before Optimisation ------------------------------
+
+------------------------------ After Optimisation ------------------------------
+Parallel structure is already optimal.
+
+---
+
+---
+
+---------------------------Loop invariant code motion---------------------------
+Allocation hoisting:
+No allocation hoisting found
+None
+ZIP
+
+================================================================================
+Parallel Accelerator Optimizing: Function tensor_zip.<locals>.\_zip,
+/content/mle-module-3-Sidv2001/minitorch/fast_ops.py (196)  
+================================================================================
+
+Parallel loop listing for Function tensor_zip.<locals>.\_zip, /content/mle-module-3-Sidv2001/minitorch/fast_ops.py (196)
+-------------------------------------------------------------------------------|loop #ID
+def \_zip( |
+out: Storage, |
+out_shape: Shape, |
+out_strides: Strides, |
+a_storage: Storage, |
+a_shape: Shape, |
+a_strides: Strides, |
+b_storage: Storage, |
+b_shape: Shape, |
+b_strides: Strides, |
+) -> None: | # TODO: Implement for Task 3.1. |
+for o in prange(len(out)): # prange is used for parallel execution----| #1
+out_index = np.zeros_like(out_shape) |
+a_index = np.zeros_like(a_shape) |
+b_index = np.zeros_like(b_shape) |
+to_index(o, out_shape, out_index) |
+broadcast_index(out_index, out_shape, a_shape, a_index) |
+broadcast_index(out_index, out_shape, b_shape, b_index) |
+a_pos = index_to_position(a_index, a_strides) |
+b_pos = index_to_position(b_index, b_strides) |
+out[o] = fn(a_storage[a_pos], b_storage[b_pos]) |
+--------------------------------- Fusing loops ---------------------------------
+Attempting fusion of parallel loops (combines loops with similar properties)...
+Following the attempted fusion of parallel for-loops there are 1 parallel for-
+loop(s) (originating from loops labelled: #1).
+
+---
+
+## ----------------------------- Before Optimisation ------------------------------
+
+------------------------------ After Optimisation ------------------------------
+Parallel structure is already optimal.
+
+---
+
+---
+
+---------------------------Loop invariant code motion---------------------------
+Allocation hoisting:
+No allocation hoisting found
+None
+REDUCE
+
+================================================================================
+Parallel Accelerator Optimizing: Function tensor_reduce.<locals>.\_reduce,
+/content/mle-module-3-Sidv2001/minitorch/fast_ops.py (241)  
+================================================================================
+
+Parallel loop listing for Function tensor_reduce.<locals>.\_reduce, /content/mle-module-3-Sidv2001/minitorch/fast_ops.py (241)
+-------------------------------------------------------------|loop #ID
+def \_reduce( |
+out: Storage, |
+out_shape: Shape, |
+out_strides: Strides, |
+a_storage: Storage, |
+a_shape: Shape, |
+a_strides: Strides, |
+reduce_dim: int, |
+) -> None: | # TODO: Implement for Task 3.1. |
+|
+for o in prange(len(out)):---------------------------| #2
+out_index: Index = np.zeros_like(out_shape) |
+reduce_size = a_shape[reduce_dim] |
+to_index(o, out_shape, out_index) |
+res = index_to_position(out_index, a_strides) |
+dim_stride = a_strides[reduce_dim] |
+for s in range(reduce_size): |
+j = res + (s \* dim_stride) |
+out[o] = fn(out[o], a_storage[j]) |
+--------------------------------- Fusing loops ---------------------------------
+Attempting fusion of parallel loops (combines loops with similar properties)...
+Following the attempted fusion of parallel for-loops there are 1 parallel for-
+loop(s) (originating from loops labelled: #2).
+
+---
+
+## ----------------------------- Before Optimisation ------------------------------
+
+------------------------------ After Optimisation ------------------------------
+Parallel structure is already optimal.
+
+---
+
+---
+
+---------------------------Loop invariant code motion---------------------------
+Allocation hoisting:
+No allocation hoisting found
+None
+MATRIX MULTIPLY
+
+================================================================================
+Parallel Accelerator Optimizing: Function \_tensor_matrix_multiply,
+/content/mle-module-3-Sidv2001/minitorch/fast_ops.py (265)  
+================================================================================
+
+Parallel loop listing for Function \_tensor\*matrix_multiply, /content/mle-module-3-Sidv2001/minitorch/fast_ops.py (265)
+------------------------------------------------------------------------------------------------------------------|loop #ID
+def \_tensor_matrix_multiply( |
+out: Storage, |
+out_shape: Shape, |
+out_strides: Strides, |
+a_storage: Storage, |
+a_shape: Shape, |
+a_strides: Strides, |
+b_storage: Storage, |
+b_shape: Shape, |
+b_strides: Strides, |
+) -> None: |
+""" |
+NUMBA tensor matrix multiply function. |
+|
+Should work for any tensor shapes that broadcast as long as |
+|
+`                                                                                                       | 
+    assert a_shape[-1] == b_shape[-2]                                                                             | 
+` |
+|
+Optimizations: |
+|
+
+- Outer loop in parallel |
+  _ No index buffers or function calls |
+  _ Inner loop should have no global writes, 1 multiply. |
+  |
+  |
+  Args: |
+  out (Storage): storage for `out` tensor |
+  out*shape (Shape): shape for `out` tensor |
+  out_strides (Strides): strides for `out` tensor |
+  a_storage (Storage): storage for `a` tensor |
+  a_shape (Shape): shape for `a` tensor |
+  a_strides (Strides): strides for `a` tensor |
+  b_storage (Storage): storage for `b` tensor |
+  b_shape (Shape): shape for `b` tensor |
+  b_strides (Strides): strides for `b` tensor |
+  |
+  Returns: |
+  None : Fills in `out` |
+  """ |
+  a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0 |
+  b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0 |
+  |
+  | # TODO: Implement for Task 3.2. |
+  assert a_shape[-1] == b_shape[-2] |
+  for o in prange(len(out)):------------------------------------------------------------------------------------| #3 # o_batch_id = o // out_strides[0] | # o_row_id = (o % out_strides[0]) // out_strides[1] | # o_col_id = o % out_shape[-1] |
+  o_batch_id = o // (out_shape[-1] * out*shape[-2]) |
+  out_row_id = (o % (out_shape[-1] * out*shape[-2])) // out_shape[-1] |
+  out_col_id = o % out_shape[-1] |
+  a_batch_row = o_batch_id * a*batch_stride + out_row_id * a*strides[-2] |
+  b_batch_col = o_batch_id * b*batch_stride + out_col_id * b*strides[-1] |
+  res = 0 |
+  for i in range(a_shape[-1]): |
+  res += a_storage[a_batch_row + (i * a*strides[-1])] * b*storage[b_batch_col + (i * b_strides[-2])] |
+  out[o] = res |
+  --------------------------------- Fusing loops ---------------------------------
+  Attempting fusion of parallel loops (combines loops with similar properties)...
+  Following the attempted fusion of parallel for-loops there are 1 parallel for-
+  loop(s) (originating from loops labelled: #3).
+
+---
+
+## ----------------------------- Before Optimisation ------------------------------
+
+------------------------------ After Optimisation ------------------------------
+Parallel structure is already optimal.
+
+---
+
+---
+
+---------------------------Loop invariant code motion---------------------------
+Allocation hoisting:
+No allocation hoisting found
+None
+
+Cuda Matrix Multiply grpah:
+![Alt text](<Screenshot 2023-11-21 at 5.45.37 PM.png>)
+
 Answers for 3.5:
 Split:
 CPU:
@@ -446,3 +679,53 @@ Epoch 470 loss 0.12983846614787506 correct 50 Time Taken: 2.35291702747345
 Epoch 480 loss 0.024310733914492285 correct 50 Time Taken: 2.3738092184066772
 Epoch 490 loss 0.34823606943242225 correct 50 Time Taken: 2.418120336532593
 GPU Large Model (300 models):
+Epoch 0 loss 10.814947722382461 correct 20 Time Taken: 5.085723876953125
+Epoch 10 loss 2.23368340958008 correct 44 Time Taken: 2.6315419912338256
+Epoch 20 loss 2.2559397222082573 correct 41 Time Taken: 2.7873212814331056
+Epoch 30 loss 1.3372157098588866 correct 45 Time Taken: 2.755616569519043
+Epoch 40 loss 2.922448439198838 correct 45 Time Taken: 2.56074800491333
+Epoch 50 loss 2.7707922716083324 correct 40 Time Taken: 2.5804891109466555
+Epoch 60 loss 3.2751754077104933 correct 43 Time Taken: 2.6305499792099
+Epoch 70 loss 2.956717212806547 correct 43 Time Taken: 2.80561306476593
+Epoch 80 loss 0.32583674799767054 correct 48 Time Taken: 2.817000079154968
+Epoch 90 loss 0.6715645381179516 correct 49 Time Taken: 2.603768539428711
+Epoch 100 loss 0.37280796320390913 correct 49 Time Taken: 2.571745491027832
+Epoch 110 loss 1.0604691310322174 correct 50 Time Taken: 2.5915724277496337
+Epoch 120 loss 0.953071416357212 correct 50 Time Taken: 2.7852306604385375
+Epoch 130 loss 0.25922657670463517 correct 50 Time Taken: 2.833358716964722
+Epoch 140 loss 0.9671825739185547 correct 50 Time Taken: 2.645137667655945
+Epoch 150 loss 0.5218153309229685 correct 50 Time Taken: 2.7896934270858766
+Epoch 160 loss 0.28940351702045425 correct 50 Time Taken: 2.6654520273208617
+Epoch 170 loss 0.5378803488483461 correct 50 Time Taken: 2.8300913095474245
+Epoch 180 loss 0.8428285815144201 correct 50 Time Taken: 2.793291687965393
+Epoch 190 loss 0.20854962670244323 correct 50 Time Taken: 2.5906220436096192
+Epoch 200 loss 0.6909211258708389 correct 50 Time Taken: 2.5971397161483765
+Epoch 210 loss 0.20221676902716193 correct 50 Time Taken: 2.646300768852234
+Epoch 220 loss 0.3757937418421413 correct 50 Time Taken: 2.8184089422225953
+Epoch 230 loss 0.25957619606235244 correct 50 Time Taken: 2.7689508199691772
+Epoch 240 loss 0.6249872282313792 correct 50 Time Taken: 2.6016371726989744
+Epoch 250 loss 0.4073510727737241 correct 50 Time Taken: 2.58032603263855
+Epoch 260 loss 0.5057069934700752 correct 50 Time Taken: 2.637078046798706
+Epoch 270 loss 0.1514374991412736 correct 50 Time Taken: 2.851837420463562
+Epoch 280 loss 0.7830979322400198 correct 50 Time Taken: 2.810435962677002
+Epoch 290 loss 0.23605371904493871 correct 50 Time Taken: 2.6026238441467284
+Epoch 300 loss 0.17405179211587163 correct 50 Time Taken: 2.57781982421875
+Epoch 310 loss 0.3334732443918438 correct 50 Time Taken: 2.6314017534255982
+Epoch 320 loss 0.24057456812961706 correct 50 Time Taken: 2.806999754905701
+Epoch 330 loss 0.2361994962133167 correct 50 Time Taken: 2.831048083305359
+Epoch 340 loss 0.23219538353026145 correct 50 Time Taken: 2.59058518409729
+Epoch 350 loss 0.2565529385075897 correct 50 Time Taken: 2.5743836164474487
+Epoch 360 loss 0.2737914448409245 correct 50 Time Taken: 2.631417679786682
+Epoch 370 loss 0.06864752561214434 correct 50 Time Taken: 2.8206281661987305
+Epoch 380 loss 0.3420080191271091 correct 50 Time Taken: 2.8508232831954956
+Epoch 390 loss 0.4289410728360797 correct 50 Time Taken: 2.6096630573272703
+Epoch 400 loss 0.21052587913281243 correct 50 Time Taken: 2.6069284200668337
+Epoch 410 loss 0.07806745509884915 correct 50 Time Taken: 3.2404919385910036
+Epoch 420 loss 0.25534710707897607 correct 50 Time Taken: 2.8297491550445555
+Epoch 430 loss 0.24547214838431197 correct 50 Time Taken: 2.596785044670105
+Epoch 440 loss 0.06387066781035969 correct 50 Time Taken: 2.574781584739685
+Epoch 450 loss 0.14752701732340767 correct 50 Time Taken: 2.5855604648590087
+Epoch 460 loss 0.1474778930858269 correct 50 Time Taken: 2.8181107521057127
+Epoch 470 loss 0.06292358554177681 correct 50 Time Taken: 2.830213713645935
+Epoch 480 loss 0.1474126318724354 correct 50 Time Taken: 2.6057613611221315
+Epoch 490 loss 0.09360997615800118 correct 50 Time Taken: 2.607413125038147
