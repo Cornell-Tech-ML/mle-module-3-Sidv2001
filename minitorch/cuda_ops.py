@@ -154,7 +154,12 @@ def tensor_map(
         in_index = cuda.local.array(MAX_DIMS, numba.int32)
         i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         # TODO: Implement for Task 3.3.
-        raise NotImplementedError("Need to implement for Task 3.3")
+        if i > out_size:
+            return
+        to_index(i, out_shape, out_index)
+        broadcast_index(out_index, out_shape, in_shape, in_index)
+        j = index_to_position(in_index, in_strides)
+        out[i] = fn(in_storage[j])
 
     return cuda.jit()(_map)  # type: ignore
 
@@ -196,7 +201,14 @@ def tensor_zip(
         i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
 
         # TODO: Implement for Task 3.3.
-        raise NotImplementedError("Need to implement for Task 3.3")
+        if i > out_size:
+            return
+        to_index(i, out_shape, out_index)
+        broadcast_index(out_index, out_shape, a_shape, a_index)
+        broadcast_index(out_index, out_shape, b_shape, b_index)
+        a_pos = index_to_position(a_index, a_strides)
+        b_pos  = index_to_position(b_index, b_strides)
+        out[i] = fn(a_storage[a_pos], b_storage[b_pos])
 
     return cuda.jit()(_zip)  # type: ignore
 
@@ -229,7 +241,15 @@ def _sum_practice(out: Storage, a: Storage, size: int) -> None:
     pos = cuda.threadIdx.x
 
     # TODO: Implement for Task 3.3.
-    raise NotImplementedError("Need to implement for Task 3.3")
+    cache[pos] = a[i] if i < size else 0.0
+    cuda.syncthreads()
+    if pos < size:
+        if pos == 0:
+            res = 0
+            for j in range(BLOCK_DIM):
+                res += cache[j]
+            out[cuda.blockIdx.x] = res
+
 
 
 jit_sum_practice = cuda.jit()(_sum_practice)
@@ -277,9 +297,27 @@ def tensor_reduce(
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
         out_pos = cuda.blockIdx.x
         pos = cuda.threadIdx.x
+        # size = len(a_storage)
+        # i = out_pos * cuda.blockDim.x + pos
+        reduce_size = a_shape[reduce_dim]
+        if out_pos < out_size:
+            if pos < reduce_size:
+                to_index(out_pos, out_shape, out_index)
+                out_index[reduce_dim] = pos
+                j = index_to_position(out_index, a_strides)
+                cache[pos] = a_storage[j]
+            cuda.syncthreads()
+            if pos == 0:
+                res = reduce_value 
+                for i in range(reduce_size):
+                    res = fn(res, cache[i])
+                out[out_pos] = res
 
+        
+
+        
         # TODO: Implement for Task 3.3.
-        raise NotImplementedError("Need to implement for Task 3.3")
+        
 
     return cuda.jit()(_reduce)  # type: ignore
 
@@ -316,7 +354,19 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     """
     BLOCK_DIM = 32
     # TODO: Implement for Task 3.3.
-    raise NotImplementedError("Need to implement for Task 3.3")
+    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+    i = cuda.threadIdx.x
+    j = cuda.threadIdx.y
+    if i < size and j < size:
+        a_shared[i, j] = a[(i * size) + j]
+        b_shared[i, j] = b[(i * size) + j]
+        cuda.syncthreads()
+        res = 0.0
+        for k in range(size):
+            res += a_shared[i, k] * b_shared[k, j]
+        out[(i * size) + j] = res
+
 
 
 jit_mm_practice = cuda.jit()(_mm_practice)
@@ -386,7 +436,42 @@ def _tensor_matrix_multiply(
     #    b) Copy into shared memory for b matrix
     #    c) Compute the dot produce for position c[i, j]
     # TODO: Implement for Task 3.4.
-    raise NotImplementedError("Need to implement for Task 3.4")
+    assert a_shape[-1] == b_shape[-2]
+    # Res is the local accumulator for the thread that will in the end be the value of the position i,j in the result matrix
+    res = 0.0
+    # Here we take the common shape (rows of a or columns of b) as this is what we loop over
+    common_shape = a_shape[-1]
+    # Over here from the perspective of each block, we take the a 32 by 32 section of a and b along their respective 
+    # common axes and move them into a locally shared array. This is effective because each thread needs to do fewer global reads
+    # as the other threads in the block (the ones in the same row (for a) or column (for b)) get the other values relevant to the 
+    # dot product that this thread is doing. 
+    for common_index in range(0, common_shape, BLOCK_DIM):
+        thread_common_row = common_index + pi
+        thread_common_col = common_index + pj
+        if thread_common_col < common_shape and i < a_shape[-2]:
+            a_loc = (batch * a_batch_stride) + (a_strides[-2] * i) + (a_strides[-1] * thread_common_col)
+            a_shared[pi, pj] = a_storage[a_loc]
+        if thread_common_row < common_shape and j < b_shape[-1]:
+            b_loc = (batch * b_batch_stride) + (b_strides[-1] * j) + (b_strides[-2] * thread_common_row)
+            b_shared[pi, pj] = b_storage[b_loc]
+        # After collecting all the data from the 3 global reads each threads do we sync the threads so that no one starts their sum
+        # while other threads are still collecting data
+        cuda.syncthreads()
+        # Finally we sum over the values from the row i (of a) (with the n to n+32 columns of that row) and the column
+        # j (of b) (with the n to n+32 rows of that column). This is then done for every block (of 32) of the common axis of both input matrices
+        for k in range(BLOCK_DIM):
+            if common_index + k < common_shape:
+                res += a_shared[pi, k] * b_shared[k, pj]
+        cuda.syncthreads()
+        # once again we sync up here because we dont want some threads to finish this step, and assign new values to the shared memory
+        # while some threads are still summing up. 
+    if i < out_shape[-2] and j < out_shape[-1]:
+        out_loc = (batch * out_strides[0]) + (out_strides[-2] * i) + (out_strides[-1] * j)
+        out[out_loc] = res
+
+    
+
+
 
 
 tensor_matrix_multiply = cuda.jit(_tensor_matrix_multiply)
